@@ -1,0 +1,77 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "signforge"
+version = "0.1.0"
+description = "Generate CNC-ready signs (SVG + DXF) from declarative descriptions."
+requires-python = ">=3.10"
+dependencies = [
+    "fonttools>=4.40",
+    "svgpathtools>=1.6",
+    "ezdxf>=1.0",
+]
+
+[project.optional-dependencies]
+preview = ["cairosvg>=2.7", "resvg-py>=0.3"]
+web = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "python-multipart>=0.0.9",
+    "jinja2>=3.1",
+    "resvg-py>=0.3",
+]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "mypy>=1.0",
+    "ruff>=0.4",
+]
+
+[project.scripts]
+signforge = "signforge.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["signforge*"]
+
+# ---------------------------------------------------------------------------
+# pytest
+# ---------------------------------------------------------------------------
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--tb=short -q"
+
+# ---------------------------------------------------------------------------
+# coverage
+# ---------------------------------------------------------------------------
+[tool.coverage.run]
+source = ["signforge"]
+omit = ["signforge/__main__.py"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+
+# ---------------------------------------------------------------------------
+# ruff
+# ---------------------------------------------------------------------------
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = [
+    "E501",   # line too long — handled by formatter, not an error
+]
+
+# ---------------------------------------------------------------------------
+# mypy
+# ---------------------------------------------------------------------------
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_ignores = true
+ignore_missing_imports = true

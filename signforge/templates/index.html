@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full antialiased">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SignForge — CNC Sign Generator · SiftForward</title>
+  <meta name="description" content="Generate CNC-ready signs as SVG + DXF from a simple form. Text outlined to paths, layers pre-colored for CAM." />
+
+  <!-- Geist (matches siftforward.com) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Geist', 'system-ui', 'sans-serif'],
+            mono: ['Geist Mono', 'monospace'],
+          },
+          colors: {
+            slate: {
+              50:  '#f8fafc',
+              100: '#f1f5f9',
+              200: '#e2e8f0',
+              300: '#cbd5e1',
+              400: '#94a3b8',
+              500: '#64748b',
+              600: '#475569',
+              700: '#334155',
+              800: '#1e293b',
+              900: '#0f172a',
+            },
+            teal: {
+              50:  '#f0fdfa',
+              100: '#ccfbf1',
+              200: '#99f6e4',
+              400: '#2dd4bf',
+              500: '#14b8a6',
+              600: '#0d9488',
+            },
+          },
+        },
+      },
+    };
+  </script>
+
+  <!-- Alpine.js + collapse plugin -->
+  <script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/collapse@3.x.x/dist/cdn.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+  <style>
+    body { font-family: 'Geist', system-ui, sans-serif; }
+    .dot-grid {
+      background-image: radial-gradient(circle, #0F172A 1px, transparent 1px);
+      background-size: 20px 20px;
+      opacity: 0.025;
+    }
+    /* Spinner */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner { animation: spin 0.8s linear infinite; }
+    /* Fade in preview */
+    @keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+    .fade-in { animation: fadeIn 0.3s ease forwards; }
+    /* Signal shimmer on header */
+    @keyframes shimmer { from { transform: translateX(-100%); } to { transform: translateX(400%); } }
+    .shimmer-line { animation: shimmer 3s ease-in-out infinite; }
+    /* Pulse dot */
+    @keyframes pulse-dot { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
+    .pulse-dot { animation: pulse-dot 2s ease-in-out infinite; }
+  </style>
+</head>
+
+<body class="min-h-full flex flex-col bg-white text-slate-900" x-data="signforge()">
+
+  <!-- ================================================================
+       HEADER
+  ================================================================ -->
+  <header class="sticky top-0 z-50 bg-white/95 backdrop-blur-sm border-b border-slate-200 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16">
+
+        <!-- Logo -->
+        <a href="https://siftforward.com" class="flex items-center gap-2.5" aria-label="SiftForward">
+          <!-- Logo mark -->
+          <svg width="42" height="28" viewBox="0 0 42 28" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <circle cx="3" cy="8" r="1.9" fill="#94a3b8" opacity="0.65"/>
+            <circle cx="2.5" cy="14" r="2.3" fill="#94a3b8" opacity="0.82"/>
+            <circle cx="3" cy="20" r="1.9" fill="#94a3b8" opacity="0.65"/>
+            <circle cx="6.5" cy="4.5" r="1.5" fill="#94a3b8" opacity="0.48"/>
+            <circle cx="6.5" cy="23.5" r="1.5" fill="#94a3b8" opacity="0.48"/>
+            <circle cx="10.5" cy="3" r="1.2" fill="#94a3b8" opacity="0.34"/>
+            <circle cx="10.5" cy="25" r="1.2" fill="#94a3b8" opacity="0.34"/>
+            <circle cx="11" cy="11" r="1" fill="#94a3b8" opacity="0.38"/>
+            <circle cx="11" cy="17" r="1" fill="#94a3b8" opacity="0.38"/>
+            <path d="M4.8 8.5 Q12 11 14 14" stroke="#94a3b8" stroke-width="0.85" opacity="0.5" fill="none" stroke-linecap="round"/>
+            <path d="M4.5 14 L14 14" stroke="#94a3b8" stroke-width="0.85" opacity="0.6" fill="none" stroke-linecap="round"/>
+            <path d="M4.8 19.5 Q12 17 14 14" stroke="#94a3b8" stroke-width="0.85" opacity="0.5" fill="none" stroke-linecap="round"/>
+            <path d="M14.5 8 L22 14 L14.5 20" stroke="#14B8A6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+            <path d="M22 8 L29.5 14 L22 20" stroke="#14B8A6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          </svg>
+          <div class="leading-tight">
+            <div class="text-xl font-bold tracking-tight text-slate-900">
+              Sift<span class="text-teal-500">Forward</span>
+            </div>
+            <div class="text-[11px] text-slate-500 mt-0.5">Finding meaning inside noise.</div>
+          </div>
+        </a>
+
+        <!-- Nav -->
+        <nav class="hidden md:flex items-center gap-7">
+          <a href="https://siftforward.com" class="text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors">Home</a>
+          <a href="https://siftforward.com/#how-it-works" class="text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors">How It Works</a>
+          <span class="text-sm font-semibold text-teal-600">SignForge</span>
+        </nav>
+
+        <!-- CTA -->
+        <div class="hidden md:flex">
+          <a href="https://siftforward.com/contact"
+             class="inline-flex items-center gap-1.5 bg-teal-500 text-white text-sm font-semibold px-5 py-2 rounded-full hover:bg-teal-600 transition-colors">
+            Get Started
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+              <path d="M2.5 6h7M6.5 3l3 3-3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </a>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ================================================================
+       HERO
+  ================================================================ -->
+  <section class="bg-white pt-12 pb-10 border-b border-slate-100 overflow-hidden relative">
+    <div class="absolute inset-0 dot-grid pointer-events-none"></div>
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
+      <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+        <div class="space-y-3">
+          <div class="inline-flex items-center gap-2 bg-teal-50 border border-teal-200 text-teal-700 text-xs font-semibold px-3 py-1.5 rounded-full">
+            <span class="w-1.5 h-1.5 rounded-full bg-teal-500 pulse-dot"></span>
+            CNC Sign Generator
+          </div>
+          <h1 class="text-4xl sm:text-5xl font-bold text-slate-900 leading-[1.1] tracking-tight">
+            Sign<span class="text-teal-500">Forge</span>
+          </h1>
+          <p class="text-lg text-slate-500 leading-relaxed max-w-xl">
+            Fill in the form — get a CNC-ready sign as SVG&nbsp;+&nbsp;DXF. Text outlined to paths, layers pre-colored for V-carve and pocket toolpaths.
+          </p>
+        </div>
+
+        <!-- Layer legend -->
+        <div class="flex flex-wrap gap-2 sm:flex-col sm:items-end sm:gap-1.5">
+          <template x-for="layer in layers" :key="layer.name">
+            <div class="inline-flex items-center gap-1.5 text-xs text-slate-500">
+              <span class="w-2.5 h-2.5 rounded-sm flex-shrink-0" :style="`background:${layer.color}`"></span>
+              <span class="font-mono" x-text="layer.name"></span>
+              <span class="text-slate-400" x-text="'— ' + layer.desc"></span>
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================================================
+       MAIN: FORM + PREVIEW
+  ================================================================ -->
+  <main class="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-10">
+    <div class="grid grid-cols-1 lg:grid-cols-[420px_1fr] gap-8 lg:gap-12 items-start">
+
+      <!-- ---- LEFT: FORM ---- -->
+      <aside>
+        <form @submit.prevent="generate()" class="space-y-6">
+
+          <!-- Style + Emblem -->
+          <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-5">
+            <div class="flex items-center gap-2 mb-1">
+              <div class="w-5 h-5 rounded-md bg-teal-50 flex items-center justify-center">
+                <svg width="11" height="11" viewBox="0 0 11 11" fill="none" aria-hidden="true">
+                  <path d="M1.5 5.5h8M5.5 1.5l4 4-4 4" stroke="#14B8A6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+              <h2 class="text-sm font-semibold text-slate-900">Style</h2>
+            </div>
+
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1.5">Style</label>
+              <div class="grid grid-cols-3 gap-2">
+                <template x-for="s in styles" :key="s.id">
+                  <button type="button"
+                    class="relative py-2.5 px-2 rounded-xl border text-xs font-semibold transition-all text-center"
+                    :class="form.style === s.id
+                      ? 'border-teal-500 bg-teal-50 text-teal-700 shadow-sm'
+                      : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'"
+                    @click="form.style = s.id; form.emblem = ''">
+                    <div x-text="s.label"></div>
+                    <div class="text-[10px] font-normal mt-0.5 opacity-70" x-text="s.sub"></div>
+                  </button>
+                </template>
+              </div>
+            </div>
+
+            <div x-show="availableEmblems.length > 0" x-transition>
+              <label class="block text-xs font-medium text-slate-600 mb-1.5">Emblem</label>
+              <div class="flex flex-wrap gap-2">
+                <button type="button"
+                  class="py-1.5 px-3 rounded-full border text-xs font-medium transition-all"
+                  :class="!form.emblem ? 'border-teal-500 bg-teal-50 text-teal-700' : 'border-slate-200 text-slate-500 hover:border-slate-300'"
+                  @click="form.emblem = ''">None</button>
+                <template x-for="e in availableEmblems" :key="e.id">
+                  <button type="button"
+                    class="py-1.5 px-3 rounded-full border text-xs font-medium transition-all"
+                    :class="form.emblem === e.id ? 'border-teal-500 bg-teal-50 text-teal-700' : 'border-slate-200 text-slate-500 hover:border-slate-300'"
+                    @click="form.emblem = e.id" x-text="e.label">
+                  </button>
+                </template>
+              </div>
+            </div>
+          </div>
+
+          <!-- Text Content -->
+          <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
+            <div class="flex items-center gap-2 mb-1">
+              <div class="w-5 h-5 rounded-md bg-teal-50 flex items-center justify-center">
+                <svg width="11" height="11" viewBox="0 0 11 11" fill="none" aria-hidden="true">
+                  <path d="M1.5 3h8M1.5 5.5h5M1.5 8h8" stroke="#14B8A6" stroke-width="1.3" stroke-linecap="round"/>
+                </svg>
+              </div>
+              <h2 class="text-sm font-semibold text-slate-900">Text</h2>
+            </div>
+
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1.5">Header <span class="text-slate-400 font-normal">(large, tracked)</span></label>
+              <input type="text" x-model="form.header" placeholder="SELF-EFFICACY"
+                class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-900 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-400 transition-colors font-mono tracking-wider uppercase" />
+            </div>
+
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1.5">Main lines <span class="text-slate-400 font-normal">(body quote)</span></label>
+              <div class="space-y-2">
+                <input type="text" x-model="form.line1" placeholder="EVERY FIX MAKES YOU"
+                  class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-900 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-400 transition-colors" />
+                <input type="text" x-model="form.line2" placeholder="HARDER TO BREAK."
+                  class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-900 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-400 transition-colors" />
+                <input type="text" x-model="form.line3" placeholder="(optional third line)"
+                  class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-900 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-400 transition-colors" />
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1.5">Subtitle <span class="text-slate-400 font-normal">(small, below)</span></label>
+              <input type="text" x-model="form.sub" placeholder="// BUILT BY EXPERIENCE //"
+                class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-900 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-400 transition-colors" />
+            </div>
+          </div>
+
+          <!-- Dimensions -->
+          <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
+            <div class="flex items-center gap-2 mb-1">
+              <div class="w-5 h-5 rounded-md bg-teal-50 flex items-center justify-center">
+                <svg width="11" height="11" viewBox="0 0 11 11" fill="none" aria-hidden="true">
+                  <rect x="1" y="2.5" width="9" height="6" rx="1" stroke="#14B8A6" stroke-width="1.2"/>
+                  <path d="M1 5.5h9" stroke="#14B8A6" stroke-width="0.8" stroke-dasharray="1.5 1" stroke-linecap="round"/>
+                </svg>
+              </div>
+              <h2 class="text-sm font-semibold text-slate-900">Dimensions</h2>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1.5">Width (in)</label>
+                <input type="number" x-model.number="form.width" min="4" max="96" step="0.5"
+                  class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-400 transition-colors" />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1.5">Height (in)</label>
+                <input type="number" x-model.number="form.height" min="2" max="48" step="0.5"
+                  class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-400 transition-colors" />
+              </div>
+            </div>
+
+            <!-- Aspect ratio visualiser -->
+            <div class="mt-1">
+              <div class="text-xs text-slate-400 mb-1.5 text-right" x-text="`${form.width}&quot; × ${form.height}&quot;`"></div>
+              <div class="bg-slate-100 rounded-lg h-10 flex items-center justify-center p-1.5">
+                <div class="bg-white border-2 border-teal-400/60 rounded-sm transition-all duration-200"
+                     :style="`width:${Math.min(100, form.width / form.height * 40)}%; height:100%;`"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Advanced -->
+          <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <button type="button"
+              class="w-full flex items-center justify-between px-6 py-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+              @click="showAdvanced = !showAdvanced">
+              <span>Advanced options</span>
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" class="transition-transform duration-200" :class="showAdvanced ? 'rotate-180' : ''" aria-hidden="true">
+                <path d="M3 5l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+            <div x-show="showAdvanced" x-collapse class="px-6 pb-5 space-y-4 border-t border-slate-100">
+              <div class="pt-4">
+                <label class="block text-xs font-medium text-slate-600 mb-1.5">
+                  Max cap height <span class="text-slate-400 font-normal">(text size ceiling, inches)</span>
+                </label>
+                <div class="flex items-center gap-3">
+                  <input type="range" x-model.number="form.cap_main_max" min="0.5" max="3" step="0.05"
+                    class="flex-1 accent-teal-500" />
+                  <span class="text-sm font-mono text-slate-700 w-10 text-right" x-text="form.cap_main_max.toFixed(2) + '&quot;'"></span>
+                </div>
+              </div>
+
+              <div x-show="form.emblem">
+                <label class="block text-xs font-medium text-slate-600 mb-1.5">
+                  Emblem zone width <span class="text-slate-400 font-normal">(inches)</span>
+                </label>
+                <div class="flex items-center gap-3">
+                  <input type="range" x-model.number="form.emblem_zone" min="3" max="12" step="0.5"
+                    class="flex-1 accent-teal-500" />
+                  <span class="text-sm font-mono text-slate-700 w-10 text-right" x-text="form.emblem_zone.toFixed(1) + '&quot;'"></span>
+                </div>
+              </div>
+
+              <div class="flex items-center gap-3">
+                <button type="button"
+                  class="relative w-9 h-5 rounded-full transition-colors duration-200 focus:outline-none"
+                  :class="form.border ? 'bg-teal-500' : 'bg-slate-200'"
+                  @click="form.border = !form.border"
+                  :aria-checked="form.border" role="switch">
+                  <span class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200"
+                        :class="form.border ? 'translate-x-4' : ''"></span>
+                </button>
+                <label class="text-xs font-medium text-slate-600 cursor-pointer" @click="form.border = !form.border">
+                  Decorative border groove
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <!-- Generate button -->
+          <button type="submit"
+            class="w-full inline-flex items-center justify-center gap-2 bg-slate-900 text-white font-semibold px-6 py-3.5 rounded-full hover:bg-slate-800 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            :disabled="loading">
+            <template x-if="loading">
+              <svg class="spinner w-4 h-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" stroke-dasharray="31.4" stroke-dashoffset="10" opacity="0.3"/>
+                <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+              </svg>
+            </template>
+            <template x-if="!loading">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                <path d="M3 7h8M8 4l3 3-3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </template>
+            <span x-text="loading ? 'Generating…' : 'Generate Sign'"></span>
+          </button>
+
+          <!-- Error -->
+          <div x-show="error" x-transition
+            class="flex items-start gap-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3">
+            <svg class="w-4 h-4 mt-0.5 flex-shrink-0" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.5"/>
+              <path d="M8 5v3.5M8 11h.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            <span x-text="error"></span>
+          </div>
+        </form>
+      </aside>
+
+      <!-- ---- RIGHT: PREVIEW ---- -->
+      <section class="space-y-5 lg:sticky lg:top-24">
+
+        <!-- Preview panel -->
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden min-h-[260px] flex flex-col">
+
+          <!-- Panel header -->
+          <div class="flex items-center justify-between px-5 py-3.5 border-b border-slate-100">
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-semibold text-slate-700">Preview</span>
+              <template x-if="result">
+                <span class="text-xs text-slate-400 font-mono" x-text="`${form.width}&quot; × ${form.height}&quot;`"></span>
+              </template>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full" :class="result ? 'bg-teal-500' : 'bg-slate-200'"></span>
+              <span class="text-xs text-slate-400" x-text="result ? 'Ready' : 'Waiting'"></span>
+            </div>
+          </div>
+
+          <!-- Image area -->
+          <div class="flex-1 flex items-center justify-center p-6">
+            <!-- Empty state -->
+            <template x-if="!result && !loading">
+              <div class="text-center space-y-3 py-8">
+                <div class="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto border border-slate-100">
+                  <svg width="28" height="18" viewBox="0 0 42 28" fill="none" aria-hidden="true">
+                    <circle cx="3" cy="8" r="1.9" fill="#94a3b8" opacity="0.4"/>
+                    <circle cx="2.5" cy="14" r="2.3" fill="#94a3b8" opacity="0.5"/>
+                    <circle cx="3" cy="20" r="1.9" fill="#94a3b8" opacity="0.4"/>
+                    <path d="M4.5 14 L14 14" stroke="#94a3b8" stroke-width="0.85" opacity="0.4" fill="none" stroke-linecap="round"/>
+                    <path d="M14.5 8 L22 14 L14.5 20" stroke="#14B8A6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.5"/>
+                    <path d="M22 8 L29.5 14 L22 20" stroke="#14B8A6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.5"/>
+                  </svg>
+                </div>
+                <p class="text-sm text-slate-400">Fill in the form and click <span class="font-semibold text-slate-600">Generate Sign</span></p>
+              </div>
+            </template>
+
+            <!-- Loading state -->
+            <template x-if="loading">
+              <div class="text-center space-y-3 py-8">
+                <svg class="spinner w-8 h-8 mx-auto text-teal-500" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2.5" stroke-dasharray="31.4" stroke-dashoffset="10" opacity="0.2"/>
+                  <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+                </svg>
+                <p class="text-sm text-slate-400">Rendering sign…</p>
+              </div>
+            </template>
+
+            <!-- Preview image -->
+            <template x-if="result && result.png_b64">
+              <div class="fade-in w-full">
+                <img :src="`data:image/png;base64,${result.png_b64}`"
+                     alt="Sign preview"
+                     class="w-full rounded-xl border border-slate-100 shadow-sm" />
+              </div>
+            </template>
+
+            <!-- No PNG (shouldn't happen) -->
+            <template x-if="result && !result.png_b64">
+              <div class="text-center py-8">
+                <p class="text-sm text-slate-400">Preview not available — download SVG to view.</p>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- Download buttons -->
+        <div x-show="result" x-transition class="grid grid-cols-2 gap-3">
+
+          <a :href="result ? `/api/download/${result.token}/svg` : '#'"
+             :class="result && result.has_svg ? '' : 'pointer-events-none opacity-40'"
+             class="group flex items-center gap-3 bg-white border border-slate-200 rounded-2xl px-5 py-4 hover:border-teal-400 hover:shadow-sm transition-all"
+             download="sign.svg">
+            <div class="w-9 h-9 bg-teal-50 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:bg-teal-100 transition-colors">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path d="M8 2v8M5 7l3 3 3-3" stroke="#14B8A6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M2 11v1.5A1.5 1.5 0 0 0 3.5 14h9a1.5 1.5 0 0 0 1.5-1.5V11" stroke="#14B8A6" stroke-width="1.5" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <div>
+              <div class="text-sm font-semibold text-slate-900">SVG</div>
+              <div class="text-xs text-slate-400">Scalable vector</div>
+            </div>
+          </a>
+
+          <a :href="result ? `/api/download/${result.token}/dxf` : '#'"
+             :class="result && result.has_dxf ? '' : 'pointer-events-none opacity-40'"
+             class="group flex items-center gap-3 bg-white border border-slate-200 rounded-2xl px-5 py-4 hover:border-teal-400 hover:shadow-sm transition-all"
+             download="sign.dxf">
+            <div class="w-9 h-9 bg-slate-50 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:bg-teal-50 transition-colors">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path d="M8 2v8M5 7l3 3 3-3" stroke="#475569" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M2 11v1.5A1.5 1.5 0 0 0 3.5 14h9a1.5 1.5 0 0 0 1.5-1.5V11" stroke="#475569" stroke-width="1.5" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <div>
+              <div class="text-sm font-semibold text-slate-900">DXF</div>
+              <div class="text-xs text-slate-400">CAM-ready layers</div>
+            </div>
+          </a>
+        </div>
+
+        <!-- CNC layer guide (shown after first generation) -->
+        <div x-show="result" x-transition
+             class="bg-slate-900 rounded-2xl p-5 text-white space-y-3">
+          <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider">DXF Layer Guide</div>
+          <div class="space-y-2">
+            <template x-for="layer in layers" :key="layer.name">
+              <div class="flex items-center gap-3">
+                <span class="w-2.5 h-2.5 rounded-sm flex-shrink-0" :style="`background:${layer.color}`"></span>
+                <span class="text-xs font-mono font-medium text-slate-300 w-24 flex-shrink-0" x-text="layer.name"></span>
+                <span class="text-xs text-slate-500" x-text="layer.desc"></span>
+              </div>
+            </template>
+          </div>
+        </div>
+
+      </section>
+    </div>
+  </main>
+
+  <!-- ================================================================
+       FOOTER
+  ================================================================ -->
+  <footer class="bg-slate-900 text-white mt-16">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-10 items-start">
+        <div class="space-y-4">
+          <a href="https://siftforward.com" class="flex items-center gap-2.5" aria-label="SiftForward">
+            <svg width="42" height="28" viewBox="0 0 42 28" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <circle cx="3" cy="8" r="1.9" fill="#94a3b8" opacity="0.65"/>
+              <circle cx="2.5" cy="14" r="2.3" fill="#94a3b8" opacity="0.82"/>
+              <circle cx="3" cy="20" r="1.9" fill="#94a3b8" opacity="0.65"/>
+              <circle cx="6.5" cy="4.5" r="1.5" fill="#94a3b8" opacity="0.48"/>
+              <circle cx="6.5" cy="23.5" r="1.5" fill="#94a3b8" opacity="0.48"/>
+              <circle cx="10.5" cy="3" r="1.2" fill="#94a3b8" opacity="0.34"/>
+              <circle cx="10.5" cy="25" r="1.2" fill="#94a3b8" opacity="0.34"/>
+              <circle cx="11" cy="11" r="1" fill="#94a3b8" opacity="0.38"/>
+              <circle cx="11" cy="17" r="1" fill="#94a3b8" opacity="0.38"/>
+              <path d="M4.8 8.5 Q12 11 14 14" stroke="#94a3b8" stroke-width="0.85" opacity="0.5" fill="none" stroke-linecap="round"/>
+              <path d="M4.5 14 L14 14" stroke="#94a3b8" stroke-width="0.85" opacity="0.6" fill="none" stroke-linecap="round"/>
+              <path d="M4.8 19.5 Q12 17 14 14" stroke="#94a3b8" stroke-width="0.85" opacity="0.5" fill="none" stroke-linecap="round"/>
+              <path d="M14.5 8 L22 14 L14.5 20" stroke="#14B8A6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+              <path d="M22 8 L29.5 14 L22 20" stroke="#14B8A6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+            </svg>
+            <div class="leading-tight">
+              <div class="text-xl font-bold tracking-tight text-white">
+                Sift<span class="text-teal-400">Forward</span>
+              </div>
+              <div class="text-[11px] text-slate-400 mt-0.5">Finding meaning inside noise.</div>
+            </div>
+          </a>
+          <a href="mailto:hello@siftforward.com"
+             class="block text-sm text-slate-500 hover:text-teal-400 transition-colors">
+            hello@siftforward.com
+          </a>
+        </div>
+
+        <div class="space-y-3">
+          <div class="text-xs font-semibold text-slate-600 uppercase tracking-wider">Navigation</div>
+          <nav class="flex flex-col gap-2">
+            <a href="https://siftforward.com" class="text-sm text-slate-400 hover:text-white transition-colors">Home</a>
+            <a href="https://siftforward.com/#how-it-works" class="text-sm text-slate-400 hover:text-white transition-colors">How It Works</a>
+            <a href="https://siftforward.com/contact" class="text-sm text-slate-400 hover:text-white transition-colors">Contact</a>
+          </nav>
+        </div>
+
+        <div class="space-y-3">
+          <div class="text-xs font-semibold text-slate-600 uppercase tracking-wider">About SignForge</div>
+          <p class="text-sm text-slate-400 leading-relaxed">
+            A SiftForward tool. Generates CNC-ready sign files — text outlined to paths, geometry layer-separated for V-carve and pocket toolpaths.
+          </p>
+          <a href="https://github.com/siftforward/signforge"
+             class="inline-flex items-center gap-1.5 text-sm text-slate-400 hover:text-white transition-colors">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+              <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
+            </svg>
+            View on GitHub
+          </a>
+        </div>
+      </div>
+
+      <div class="mt-10 pt-6 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3">
+        <p class="text-xs text-slate-600">© SiftForward. Wisconsin-rooted. Practically built.</p>
+        <p class="text-xs text-slate-600">Finding meaning inside noise.</p>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ================================================================
+       ALPINE.JS APP
+  ================================================================ -->
+  <script>
+    function signforge() {
+      return {
+        loading: false,
+        error: null,
+        result: null,
+        showAdvanced: false,
+
+        form: {
+          style: 'cyberpunk',
+          emblem: 'circuit',
+          header: 'SELF-EFFICACY',
+          line1: 'EVERY FIX MAKES YOU',
+          line2: 'HARDER TO BREAK.',
+          line3: '',
+          sub: '// BUILT BY EXPERIENCE //',
+          width: 28,
+          height: 10,
+          border: true,
+          cap_main_max: 1.25,
+          emblem_zone: 8.0,
+        },
+
+        styles: [
+          { id: 'cyberpunk', label: 'Cyberpunk', sub: 'Orbitron · circuit' },
+          { id: 'woodcut',   label: 'Woodcut',   sub: 'Bold · storm' },
+          { id: 'classic',   label: 'Classic',   sub: 'Serif · no emblem' },
+        ],
+
+        emblemMap: {
+          cyberpunk: [{ id: 'circuit', label: 'Circuit' }],
+          woodcut:   [{ id: 'storm',   label: 'Storm' }],
+          classic:   [],
+        },
+
+        layers: [
+          { name: 'OUTER_CUT', color: '#ef4444', desc: 'Profile cut, outside line, with tabs' },
+          { name: 'BORDER',    color: '#3b82f6', desc: 'V-bit groove ~0.06" deep' },
+          { name: 'TEXT',      color: '#f8fafc', desc: 'V-carve closed letter contours' },
+          { name: 'EMBLEM',    color: '#22c55e', desc: 'Pocket toolpath (filled shapes)' },
+          { name: 'TRACES',    color: '#06b6d4', desc: 'Engrave on-line, V-bit ~0.06"' },
+          { name: 'ORNAMENT',  color: '#d946ef', desc: 'V-bit decorative groove' },
+        ],
+
+        get availableEmblems() {
+          return this.emblemMap[this.form.style] || [];
+        },
+
+        async generate() {
+          this.loading = true;
+          this.error = null;
+
+          const body = new FormData();
+          body.append('style', this.form.style);
+          body.append('emblem', this.form.emblem || '');
+          body.append('header', this.form.header || '');
+          body.append('line1',  this.form.line1  || '');
+          body.append('line2',  this.form.line2  || '');
+          body.append('line3',  this.form.line3  || '');
+          body.append('sub',    this.form.sub    || '');
+          body.append('width',  this.form.width);
+          body.append('height', this.form.height);
+          body.append('border', this.form.border ? 'true' : '');
+          body.append('cap_main_max', this.form.cap_main_max);
+          body.append('emblem_zone', this.form.emblem_zone);
+
+          try {
+            const resp = await fetch('/api/generate', { method: 'POST', body });
+            if (!resp.ok) {
+              const err = await resp.json().catch(() => ({ detail: resp.statusText }));
+              throw new Error(err.detail || 'Generation failed');
+            }
+            this.result = await resp.json();
+          } catch (e) {
+            this.error = e.message || 'Something went wrong. Please try again.';
+          } finally {
+            this.loading = false;
+          }
+        },
+      };
+    }
+  </script>
+
+</body>
+</html>
