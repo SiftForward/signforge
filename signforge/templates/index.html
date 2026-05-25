@@ -442,10 +442,10 @@
         <!-- Download buttons -->
         <div x-show="result" x-transition class="grid grid-cols-2 gap-3">
 
-          <a :href="result ? `/api/download/${result.token}/svg` : '#'"
-             :class="result && result.has_svg ? '' : 'pointer-events-none opacity-40'"
-             class="group flex items-center gap-3 bg-white border border-slate-200 rounded-2xl px-5 py-4 hover:border-teal-400 hover:shadow-sm transition-all"
-             download="sign.svg">
+          <button type="button"
+             @click="downloadB64(result.svg_b64, 'sign.svg', 'image/svg+xml')"
+             :disabled="!result || !result.svg_b64"
+             class="group flex items-center gap-3 bg-white border border-slate-200 rounded-2xl px-5 py-4 hover:border-teal-400 hover:shadow-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed text-left w-full">
             <div class="w-9 h-9 bg-teal-50 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:bg-teal-100 transition-colors">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
                 <path d="M8 2v8M5 7l3 3 3-3" stroke="#14B8A6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -456,12 +456,12 @@
               <div class="text-sm font-semibold text-slate-900">SVG</div>
               <div class="text-xs text-slate-400">Scalable vector</div>
             </div>
-          </a>
+          </button>
 
-          <a :href="result ? `/api/download/${result.token}/dxf` : '#'"
-             :class="result && result.has_dxf ? '' : 'pointer-events-none opacity-40'"
-             class="group flex items-center gap-3 bg-white border border-slate-200 rounded-2xl px-5 py-4 hover:border-teal-400 hover:shadow-sm transition-all"
-             download="sign.dxf">
+          <button type="button"
+             @click="downloadB64(result.dxf_b64, 'sign.dxf', 'application/dxf')"
+             :disabled="!result || !result.dxf_b64"
+             class="group flex items-center gap-3 bg-white border border-slate-200 rounded-2xl px-5 py-4 hover:border-teal-400 hover:shadow-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed text-left w-full">
             <div class="w-9 h-9 bg-slate-50 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:bg-teal-50 transition-colors">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
                 <path d="M8 2v8M5 7l3 3 3-3" stroke="#475569" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -472,7 +472,7 @@
               <div class="text-sm font-semibold text-slate-900">DXF</div>
               <div class="text-xs text-slate-400">CAM-ready layers</div>
             </div>
-          </a>
+          </button>
         </div>
 
         <!-- CNC layer guide (shown after first generation) -->
@@ -643,6 +643,18 @@
           } finally {
             this.loading = false;
           }
+        },
+
+        downloadB64(b64, filename, mimeType) {
+          if (!b64) return;
+          const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+          const blob = new Blob([bytes], { type: mimeType });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = filename;
+          a.click();
+          URL.revokeObjectURL(url);
         },
       };
     }

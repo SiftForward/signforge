@@ -1,0 +1,7 @@
+fonttools>=4.40
+svgpathtools>=1.6
+ezdxf>=1.0
+fastapi>=0.115
+uvicorn[standard]>=0.30
+python-multipart>=0.0.9
+resvg-py>=0.3
